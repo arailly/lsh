@@ -24,17 +24,16 @@ int main() {
     int n = config["n"], n_query = config["n_query"];
     float range = config["range"];
     int k = config["k"];
+    int L = config["L"];
     const string data_path = config["data_path"];
     const string query_path = config["query_path"];
     const string save_path = config["save_path"];
 
     const auto queries = read_csv(query_path, n_query);
 
-    cout << "complete: load data" << endl;
-
     size_t d = queries[0].size();
 
-    auto index = LSHIndex(k, range, d);
+    auto index = LSHIndex(k, range, d, L);
     index.build(data_path, n);
 
     cout << "complete: build index" << endl;

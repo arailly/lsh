@@ -9,7 +9,7 @@ using namespace lsh;
 
 TEST(lsh, create_hash_func) {
     const int k = 2, L = 1, d = 2, r = 1;
-    auto index = LSHIndex(k, r, d);
+    auto index = LSHIndex(k, r, d, L);
     auto hash_func = index.create_hash_family();
     const Point p(0, {1, 2});
     const auto hash_vector = hash_func(p);
@@ -17,17 +17,17 @@ TEST(lsh, create_hash_func) {
 }
 
 TEST(lsh, find) {
-    const int k = 2, d = 128, r = 1, n = 1;
+    const int k = 2, d = 128, r = 1, n = 1, L = 1;
     const string data_path = "/Users/yusuke-arai/workspace/dataset/sift/sift_base/";
     const auto series = load_data(data_path, n);
     auto series_for_index = series;
 
-    auto index = LSHIndex(k, r, d);
+    auto index = LSHIndex(k, r, d, L);
     index.build(series_for_index);
 
     for (int i = 0; i < 10; i++) {
         bool include_self = false;
-        const auto find_result = index.find(series[i]);
+        const auto find_result = index.find(index.G[0](series[i]), index.hash_tables[0]);
         for (const auto e : find_result) {
             if (e.id == i) include_self = true;
         }
@@ -36,18 +36,18 @@ TEST(lsh, find) {
 }
 
 TEST(lsh, search) {
-    const int k = 2, d = 128, r = 250, n = 3;
-    float range = 400;
+    const int k = 2, d = 128, r = 250, n = 3, L = 3;
+    float range = 350;
     const string data_path = "/Users/yusuke-arai/workspace/dataset/sift/sift_base/";
     const auto series = load_data(data_path, n);
     auto series_for_index = series;
 
-    auto index = LSHIndex(k, r, d);
+    auto index = LSHIndex(k, r, d, L);
     index.build(series_for_index);
 
     for (const auto i : vector<int>{12, 21, 22, 23, 30, 40}) {
         const auto result = index.search(series[i], range);
-        ASSERT_GT(result.size(), 0);
+        ASSERT_GT(result.series.size(), 0);
     }
 }
 

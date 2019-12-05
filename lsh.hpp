@@ -36,14 +36,16 @@ namespace lsh {
     typedef function<vector<int>(const Point&)> HashFamilyFunc;
 
     struct LSHIndex {
-        const int k, d;
+        const int k, d, L;
         const float r;
-        HashFamilyFunc g;
-        unordered_multimap<vector<int>, Point, VectorHash> hash_table;
+        vector<HashFamilyFunc> G;
+        vector<unordered_multimap<vector<int>, Point, VectorHash>> hash_tables;
         mt19937 engine;
 
-        LSHIndex(int k_, float r_, int d_, unsigned random_state = 42) :
-            k(k_), r(r_), d(d_), engine(mt19937(random_state)) {}
+        LSHIndex(int k, float r, int d, int L, unsigned random_state = 42) :
+            k(k), r(r), d(d), L(L),
+            hash_tables(vector<unordered_multimap<vector<int>, Point, VectorHash>>(L)),
+            engine(mt19937(random_state)) {}
 
         HashFunc create_hash_func() {
             normal_distribution<float> norm_dist(0.0, 1.0);
@@ -79,13 +81,16 @@ namespace lsh {
 
         void build(Series& series) {
             // set hash function
-            g = create_hash_family();
+            for (int i = 0; i < L; i++) G.push_back(create_hash_family());
 
             // insert series into hash table
-            for (int i = 0; i < series.size(); i++) {
-                auto& point = series[i];
-                const auto hash_value = g(point);
-                hash_table.emplace(hash_value, move(point));
+#pragma omp parallel for
+            for (int i = 0; i < L; i++) {
+                for (int j = 0; j < series.size(); j++) {
+                    auto point = series[j];
+                    const auto hash_value = G[i](point);
+                    hash_tables[i].emplace(hash_value, move(point));
+                }
             }
         }
 
@@ -95,8 +100,9 @@ namespace lsh {
             build(series);
         }
 
-        Series find(const Point& query) const {
-            const auto key = g(query);
+        Series find(const vector<int> key,
+                    const unordered_multimap<vector<int>, Point, VectorHash>&
+                    hash_table) const {
             Series result;
             auto bucket_itr = hash_table.equal_range(key);
             for (auto itr = bucket_itr.first; itr != bucket_itr.second; itr++) {
@@ -109,12 +115,18 @@ namespace lsh {
             const auto start = get_now();
             auto result = SearchResult();
 
-            const auto bucket_contents = find(query);
+            unordered_map<size_t, bool> checked;
+            for (int i = 0; i < L; i++) {
+                const auto key = G[i](query);
+                const auto bucket_contents = find(key, hash_tables[i]);
+                result.n_bucket_content += bucket_contents.size();
 
-            result.n_bucket_content = bucket_contents.size();
-
-            for (const auto point : bucket_contents) {
-                if (euclidean_distance(query, point) < range) result.series.push_back(point);
+                for (const auto point : bucket_contents) {
+                    if (checked[point.id]) continue;
+                    checked[point.id] = true;
+                    if (euclidean_distance(query, point) < range)
+                        result.series.push_back(point);
+                }
             }
 
             const auto end = get_now();
