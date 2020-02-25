@@ -51,9 +51,76 @@ TEST(lsh, search) {
     }
 }
 
-TEST(s, s) {
-    mt19937 engine(42);
-    normal_distribution<float> norm_dist(0.0, 1.0);
-    auto a = norm_dist(engine);
-    a = 1;
+TEST(lsh, euclidean) {
+    const int k = 3, d = 2, r = 3, L = 4;
+    const auto series = [&]() {
+        auto series_ = Series();
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                const auto id = (size_t)(10 * i + j);
+                const float x = i, y = j;
+                const auto point = Point(id, {x, y});
+                series_.push_back(point);
+            }
+        }
+        return series_;
+    }();
+    auto series_for_index = series;
+
+    auto index = LSHIndex(k, r, d, L);
+    index.build(series_for_index);
+
+    const auto query = Point(999, {4.5, 4.5});
+
+    const auto result = index.search(query, 1.5);
+    ASSERT_EQ(result.series.size(), 4);
+}
+
+TEST(lsh, manhattan) {
+    const int k = 3, d = 2, r = 5, L = 10;
+    const auto series = [&]() {
+        auto series_ = Series();
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                const auto id = (size_t)(10 * i + j);
+                const float x = i, y = j;
+                const auto point = Point(id, {x, y});
+                series_.push_back(point);
+            }
+        }
+        return series_;
+    }();
+    auto series_for_index = series;
+
+    auto index = LSHIndex(k, r, d, L, "manhattan");
+    index.build(series_for_index);
+
+    const auto query = Point(999, {4.5, 4.5});
+
+    const auto result = index.search(query, 1.1);
+    ASSERT_EQ(result.series.size(), 4);
+}
+
+TEST(lsh, angular) {
+    const int k = 3, d = 2, r = 5, L = 20;
+    const auto series = [&]() {
+        auto series_ = Series();
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                const auto id = (size_t)(10 * i + j);
+                const float x = i, y = j;
+                const auto point = Point(id, {x, y});
+                series_.push_back(point);
+            }
+        }
+        return series_;
+    }();
+    auto series_for_index = series;
+
+    auto index = LSHIndex(k, r, d, L, "angular");
+    index.build(series_for_index);
+
+    const auto query = Point(999, {4.5, 4.5});
+    const auto result = index.search(query, 0.0001);
+    ASSERT_EQ(result.series.size(), 6);
 }

@@ -37,23 +37,36 @@ namespace lsh {
 
     struct LSHIndex {
         const int k, d, L;
+        const DistanceFunction distance_function;
+        const string distance_type;
         const float r;
+        vector<vector<float>> rotator;
         vector<HashFamilyFunc> G;
         vector<unordered_multimap<vector<int>, Point, VectorHash>> hash_tables;
         mt19937 engine;
 
-        LSHIndex(int k, float r, int d, int L, unsigned random_state = 42) :
+        LSHIndex(int k, float r, int d, int L,
+                 string distance = "euclidean", unsigned random_state = 42) :
             k(k), r(r), d(d), L(L),
+            rotator(vector<vector<float>>(d, vector<float>(d))),
+            distance_type(distance), distance_function(select_distance(distance)),
             hash_tables(vector<unordered_multimap<vector<int>, Point, VectorHash>>(L)),
-            engine(mt19937(random_state)) {}
+            engine(mt19937(random_state)) {
+//            rotator.assign(d, vector<float>(d));
+        }
 
         HashFunc create_hash_func() {
-            normal_distribution<float> norm_dist(0.0, 1.0);
+            cauchy_distribution<float> cauchy_dist(0, 1);
+            normal_distribution<float> norm_dist(0, 1);
             uniform_real_distribution<float> unif_dist(0, r);
 
             const auto a = [&]() {
                 vector<float> random_vector;
-                for (int j = 0; j < d; j++) random_vector.push_back(norm_dist(engine));
+                for (int j = 0; j < d; j++) {
+                    if (distance_type == "manhattan")
+                        random_vector.push_back(cauchy_dist(engine));
+                    else random_vector.push_back(norm_dist(engine));
+                }
                 return random_vector;
             }();
 
@@ -79,15 +92,43 @@ namespace lsh {
             };
         }
 
+        void init_rotator() {
+            normal_distribution<float> norm_dist;
+            for (int i = 0; i < d; i++)
+                for (int j = 0; j < d; j++)
+                    rotator[i][j] = norm_dist(engine);
+        }
+
+        Point rotate(const Point& point) const {
+            const auto origin = vector<float>(point.size(), 0);
+            auto transformed = vector<float>(point.size(), 0);
+            for (int i = 0; i < point.size(); i++) {
+                for (int j = 0; j < point.size(); j++) {
+                    transformed[i] += rotator[i][j] * point[j];
+                }
+            }
+            const float norm = euclidean_distance(transformed, origin);
+            for (int i = 0; i < point.size(); i++) {
+                transformed[i] /= norm;
+            }
+            return transformed;
+        }
+
         void build(Series& series) {
             // set hash function
             for (int i = 0; i < L; i++) G.push_back(create_hash_family());
+
+            // set rotator
+            if (distance_type == "angular") init_rotator();
 
             // insert series into hash table
 #pragma omp parallel for
             for (int i = 0; i < L; i++) {
                 for (int j = 0; j < series.size(); j++) {
-                    auto point = series[j];
+                    auto point = [&]() {
+                        if (distance_type == "angualr") return rotate(series[j]);
+                        else return series[j];
+                    }();
                     const auto hash_value = G[i](point);
                     hash_tables[i].emplace(hash_value, move(point));
                 }
@@ -117,14 +158,19 @@ namespace lsh {
 
             unordered_map<size_t, bool> checked;
             for (int i = 0; i < L; i++) {
-                const auto key = G[i](query);
+//                const auto key = G[i](query);
+                const auto key = [&]() {
+                    if (distance_type == "angular")
+                        return G[i](rotate(query));
+                    else return G[i](query);
+                }();
                 const auto bucket_contents = find(key, hash_tables[i]);
                 result.n_bucket_content += bucket_contents.size();
 
                 for (const auto point : bucket_contents) {
                     if (checked[point.id]) continue;
                     checked[point.id] = true;
-                    if (euclidean_distance(query, point) < range)
+                    if (distance_function(query, point) < range)
                         result.series.push_back(point);
                 }
             }
