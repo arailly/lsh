@@ -119,9 +119,9 @@ namespace lsh {
         }
 
         void insert(const Point& point) {
-#pragma omp parallel for
             for (int i = 0; i < L; i++) {
                 const auto key = calc_hash_key(point, G[i]);
+#pragma omp critical
                 hash_tables[i].emplace(key, point);
             }
         }
@@ -134,6 +134,7 @@ namespace lsh {
             if (distance_type == "angular") init_rotator();
 
             // insert series into hash table
+#pragma omp parallel for
             for (int i = 0; i < series.size(); i++) insert(series[i]);
         }
 
