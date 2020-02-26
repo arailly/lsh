@@ -2,6 +2,7 @@
   "n": 1000,
   "n_query": 100,
   "range": 250,
+  "r": 250,
   "k": 3,
   "L": 8,
   "distance": "euclidean",
