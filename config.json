@@ -4,6 +4,7 @@
   "range": 250,
   "k": 3,
   "L": 3,
+  "distance": "euclidean",
   "data_path": "/home/arai/workspace/dataset/sift/sift_base/",
   "query_path": "/home/arai/workspace/dataset/sift/sift_query.csv",
   "save_path": "/home/arai/workspace/result/range-search/lsh/range250-k3-L3.csv"

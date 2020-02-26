@@ -25,6 +25,7 @@ int main() {
     float range = config["range"];
     int k = config["k"];
     int L = config["L"];
+    const string distance = config["distance"];
     const string data_path = config["data_path"];
     const string query_path = config["query_path"];
     const string save_path = config["save_path"];
@@ -33,7 +34,7 @@ int main() {
 
     size_t d = queries[0].size();
 
-    auto index = LSHIndex(k, range, d, L);
+    auto index = LSHIndex(k, range, d, L, distance);
     index.build(data_path, n);
 
     cout << "complete: build index" << endl;
