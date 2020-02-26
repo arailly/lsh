@@ -1,11 +1,11 @@
 {
   "n": 1000,
-  "n_query": 10000,
+  "n_query": 100,
   "range": 250,
   "k": 3,
-  "L": 3,
+  "L": 8,
   "distance": "euclidean",
-  "data_path": "/home/arai/workspace/dataset/sift/sift_base/",
+  "data_path": "/home/arai/workspace/dataset/sift/data1m/",
   "query_path": "/home/arai/workspace/dataset/sift/sift_query.csv",
-  "save_path": "/home/arai/workspace/result/range-search/lsh/range250-k3-L3.csv"
+  "save_path": "/home/arai/workspace/result/range-search/lsh/sift/data1m/k3L8/range250-sampled.csv"
 }
