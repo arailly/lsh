@@ -102,7 +102,8 @@ TEST(lsh, manhattan) {
 }
 
 TEST(lsh, angular) {
-    const int k = 3, d = 2, r = 5, L = 20;
+    const int k = 3, d = 2, L = 5;
+    const float r = 0.0001;
     const auto series = [&]() {
         auto series_ = Series();
         for (int i = 0; i < 10; i++) {
@@ -122,5 +123,5 @@ TEST(lsh, angular) {
 
     const auto query = Point(999, {4.5, 4.5});
     const auto result = index.search(query, 0.0001);
-    ASSERT_EQ(result.series.size(), 6);
+    ASSERT_EQ(result.series.size(), 7);
 }

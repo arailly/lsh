@@ -34,6 +34,7 @@ namespace lsh {
 
     typedef function<int(const Point&)> HashFunc;
     typedef function<vector<int>(const Point&)> HashFamilyFunc;
+    typedef unordered_multimap<vector<int>, Point, VectorHash> HashTable;
 
     struct LSHIndex {
         const int k, d, L;
@@ -42,7 +43,7 @@ namespace lsh {
         const float r;
         vector<vector<float>> rotator;
         vector<HashFamilyFunc> G;
-        vector<unordered_multimap<vector<int>, Point, VectorHash>> hash_tables;
+        vector<HashTable> hash_tables;
         mt19937 engine;
 
         LSHIndex(int k, float r, int d, int L,
@@ -51,9 +52,7 @@ namespace lsh {
             rotator(vector<vector<float>>(d, vector<float>(d))),
             distance_type(distance), distance_function(select_distance(distance)),
             hash_tables(vector<unordered_multimap<vector<int>, Point, VectorHash>>(L)),
-            engine(mt19937(random_state)) {
-//            rotator.assign(d, vector<float>(d));
-        }
+            engine(mt19937(random_state)) {}
 
         HashFunc create_hash_func() {
             cauchy_distribution<float> cauchy_dist(0, 1);
@@ -114,6 +113,19 @@ namespace lsh {
             return transformed;
         }
 
+        vector<int> calc_hash_key(const Point& point, HashFamilyFunc g) const {
+            if (distance_type == "angular") return g(rotate(point));
+            return g(point);
+        }
+
+        void insert(const Point& point) {
+#pragma omp parallel for
+            for (int i = 0; i < L; i++) {
+                const auto key = calc_hash_key(point, G[i]);
+                hash_tables[i].emplace(key, point);
+            }
+        }
+
         void build(Series& series) {
             // set hash function
             for (int i = 0; i < L; i++) G.push_back(create_hash_family());
@@ -122,17 +134,7 @@ namespace lsh {
             if (distance_type == "angular") init_rotator();
 
             // insert series into hash table
-#pragma omp parallel for
-            for (int i = 0; i < L; i++) {
-                for (int j = 0; j < series.size(); j++) {
-                    auto point = [&]() {
-                        if (distance_type == "angualr") return rotate(series[j]);
-                        else return series[j];
-                    }();
-                    const auto hash_value = G[i](point);
-                    hash_tables[i].emplace(hash_value, move(point));
-                }
-            }
+            for (int i = 0; i < series.size(); i++) insert(series[i]);
         }
 
         void build(const string& data_path, int n) {
@@ -152,27 +154,32 @@ namespace lsh {
             return result;
         }
 
+        Series get_bucket_contents(const Point& query) const {
+            Series result;
+            for (int i = 0; i < L; i++) {
+                const HashTable& hash_table = hash_tables[i];
+                const auto key = calc_hash_key(query, G[i]);
+                auto bucket_itr = hash_table.equal_range(key);
+                for (auto itr = bucket_itr.first; itr != bucket_itr.second; itr++) {
+                    result.push_back(itr->second);
+                }
+            }
+            return result;
+        }
+
         SearchResult search(const Point& query, float range) const {
             const auto start = get_now();
             auto result = SearchResult();
 
             unordered_map<size_t, bool> checked;
-            for (int i = 0; i < L; i++) {
-//                const auto key = G[i](query);
-                const auto key = [&]() {
-                    if (distance_type == "angular")
-                        return G[i](rotate(query));
-                    else return G[i](query);
-                }();
-                const auto bucket_contents = find(key, hash_tables[i]);
-                result.n_bucket_content += bucket_contents.size();
+            const auto bucket_contents = get_bucket_contents(query);
+            result.n_bucket_content += bucket_contents.size();
 
-                for (const auto point : bucket_contents) {
-                    if (checked[point.id]) continue;
-                    checked[point.id] = true;
-                    if (distance_function(query, point) < range)
-                        result.series.push_back(point);
-                }
+            for (const auto point : bucket_contents) {
+                if (checked[point.id]) continue;
+                checked[point.id] = true;
+                if (distance_function(query, point) < range)
+                    result.series.push_back(point);
             }
 
             const auto end = get_now();
