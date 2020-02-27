@@ -1,12 +1,12 @@
 {
   "n": 2000,
   "n_query": 1,
-  "range": 12,
-  "r": 12,
+  "range": 14,
+  "r": 14,
   "k": 3,
   "L": 8,
   "distance": "manhattan",
   "data_path": "/home/arai/workspace/dataset/hepmass/mass1000/data7m/",
   "query_path": "/home/arai/workspace/dataset/hepmass/mass1000/query3500k/",
-  "save_path": "/home/arai/workspace/result/range-search/lsh/hepmass/data2m/k3L8/range12-sample.csv"
+  "save_path": "/home/arai/workspace/result/range-search/lsh/hepmass/data2m/k3L8/range13-sample.csv"
 }
