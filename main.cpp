@@ -31,7 +31,7 @@ int main() {
     const string query_path = config["query_path"];
     const string save_path = config["save_path"];
 
-    const auto queries = read_csv(query_path, n_query);
+    const auto queries = load_data(query_path, n_query);
 
     size_t d = queries[0].size();
 

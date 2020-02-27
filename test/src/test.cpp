@@ -77,7 +77,7 @@ TEST(lsh, euclidean) {
 }
 
 TEST(lsh, manhattan) {
-    const int k = 3, d = 2, r = 5, L = 10;
+    const int k = 3, d = 2, r = 2, L = 10;
     const auto series = [&]() {
         auto series_ = Series();
         for (int i = 0; i < 10; i++) {
