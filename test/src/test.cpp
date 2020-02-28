@@ -102,7 +102,7 @@ TEST(lsh, manhattan) {
 }
 
 TEST(lsh, angular) {
-    const int k = 4, d = 2, L = 3;
+    const int k = 4, d = 2, L = 1;
     const float r = 0.00001;
     const auto series = [&]() {
         auto series_ = Series();

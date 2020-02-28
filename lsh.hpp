@@ -70,7 +70,7 @@ namespace lsh {
             const auto b = unif_dist(engine);
 
             return [=](const Point& p) {
-                const auto ip = inner_product(p.begin(), p.end(), a.begin(), 0);
+                const auto ip = inner_product(p.begin(), p.end(), a.begin(), 0.0);
                 return static_cast<int>((ip + b) / (r * 1.0));
             };
         }
