@@ -41,7 +41,6 @@ namespace lsh {
         const DistanceFunction distance_function;
         const string distance_type;
         const float r;
-        vector<vector<float>> rotator;
         vector<HashFamilyFunc> G;
         vector<HashTable> hash_tables;
         mt19937 engine;
@@ -49,7 +48,6 @@ namespace lsh {
         LSHIndex(int k, float r, int d, int L,
                  string distance = "euclidean", unsigned random_state = 42) :
             k(k), r(r), d(d), L(L),
-            rotator(vector<vector<float>>(d, vector<float>(d))),
             distance_type(distance), distance_function(select_distance(distance)),
             hash_tables(vector<unordered_multimap<vector<int>, Point, VectorHash>>(L)),
             engine(mt19937(random_state)) {}
@@ -91,30 +89,18 @@ namespace lsh {
             };
         }
 
-        void init_rotator() {
-            normal_distribution<float> norm_dist;
-            for (int i = 0; i < d; i++)
-                for (int j = 0; j < d; j++)
-                    rotator[i][j] = norm_dist(engine);
-        }
-
-        Point rotate(const Point& point) const {
+        Point normalize(const Point& point) const {
+            auto normalized = vector<float>(point.size(), 0);
             const auto origin = vector<float>(point.size(), 0);
-            auto transformed = vector<float>(point.size(), 0);
+            const float norm = euclidean_distance(point, origin);
             for (int i = 0; i < point.size(); i++) {
-                for (int j = 0; j < point.size(); j++) {
-                    transformed[i] += rotator[i][j] * point[j];
-                }
+                normalized[i] = point[i] / norm;
             }
-            const float norm = euclidean_distance(transformed, origin);
-            for (int i = 0; i < point.size(); i++) {
-                transformed[i] /= norm;
-            }
-            return transformed;
+            return normalized;
         }
 
         vector<int> calc_hash_key(const Point& point, HashFamilyFunc g) const {
-            if (distance_type == "angular") return g(rotate(point));
+            if (distance_type == "angular") return g(normalize(point));
             return g(point);
         }
 
@@ -129,9 +115,6 @@ namespace lsh {
         void build(Series& series) {
             // set hash function
             for (int i = 0; i < L; i++) G.push_back(create_hash_family());
-
-            // set rotator
-            if (distance_type == "angular") init_rotator();
 
             // insert series into hash table
             for (int i = 0; i < series.size(); i++) insert(series[i]);
