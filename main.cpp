@@ -23,7 +23,7 @@ int main() {
     const auto config = read_config();
     int n = config["n"], n_query = config["n_query"];
     float range = config["range"];
-    int r = config["r"];
+    float r = config["r"];
     int k = config["k"];
     int L = config["L"];
     const string distance = config["distance"];
