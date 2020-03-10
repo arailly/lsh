@@ -69,10 +69,18 @@ namespace lsh {
 
             const auto b = unif_dist(engine);
 
-            return [=](const Point& p) {
-                const auto ip = inner_product(p.begin(), p.end(), a.begin(), 0.0);
-                return static_cast<int>((ip + b) / (r * 1.0));
-            };
+            if (distance_type == "angular") {
+                return [=](const Point& p) {
+                    const auto normalized = normalize(p);
+                    const auto ip = inner_product(normalized.begin(), normalized.end(), a.begin(), 0.0);
+                    return static_cast<int>((ip + b) / (r * 1.0));
+                };
+            } else {
+                return [=](const Point& p) {
+                    const auto ip = inner_product(p.begin(), p.end(), a.begin(), 0.0);
+                    return static_cast<int>((ip + b) / (r * 1.0));
+                };
+            }
         }
 
         HashFamilyFunc create_hash_family() {
@@ -99,15 +107,10 @@ namespace lsh {
             return normalized;
         }
 
-        vector<int> calc_hash_key(const Point& point, HashFamilyFunc g) const {
-            if (distance_type == "angular") return g(normalize(point));
-            return g(point);
-        }
-
         void insert(const Point& point) {
 #pragma omp parallel for
             for (int i = 0; i < L; i++) {
-                const auto key = calc_hash_key(point, G[i]);
+                const auto key = G[i](point);
                 hash_tables[i].emplace(key, point);
             }
         }
@@ -141,7 +144,7 @@ namespace lsh {
             Series result;
             for (int i = 0; i < L; i++) {
                 const HashTable& hash_table = hash_tables[i];
-                const auto key = calc_hash_key(query, G[i]);
+                const auto key = G[i](query);
                 auto bucket_itr = hash_table.equal_range(key);
                 for (auto itr = bucket_itr.first; itr != bucket_itr.second; itr++) {
                     result.push_back(itr->second);
