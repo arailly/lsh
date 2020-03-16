@@ -18,7 +18,7 @@ TEST(lsh, create_hash_func) {
 
 TEST(lsh, find) {
     const int k = 2, d = 128, r = 1, n = 1, L = 1;
-    const string data_path = "/Users/yusuke-arai/workspace/dataset/sift/sift_base/";
+    const string data_path = "/home/arai/workspace/dataset/sift/sift_base/";
     const auto series = load_data(data_path, n);
     auto series_for_index = series;
 
@@ -38,7 +38,7 @@ TEST(lsh, find) {
 TEST(lsh, search) {
     const int k = 2, d = 128, r = 250, n = 3, L = 3;
     float range = 350;
-    const string data_path = "/Users/yusuke-arai/workspace/dataset/sift/sift_base/";
+    const string data_path = "/home/arai/workspace/dataset/sift/sift_base/";
     const auto series = load_data(data_path, n);
     auto series_for_index = series;
 
