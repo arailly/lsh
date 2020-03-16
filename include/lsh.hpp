@@ -34,13 +34,15 @@ namespace lsh {
 
     typedef function<int(const Point&)> HashFunc;
     typedef function<vector<int>(const Point&)> HashFamilyFunc;
-    typedef unordered_multimap<vector<int>, Point, VectorHash> HashTable;
+    typedef vector<reference_wrapper<const Point>> RefSeries;
+    typedef unordered_map<vector<int>, RefSeries, VectorHash> HashTable;
 
     struct LSHIndex {
         const int k, d, L;
         const DistanceFunction distance_function;
         const string distance_type;
         const float r;
+        Series series;
         vector<HashFamilyFunc> G;
         vector<HashTable> hash_tables;
         mt19937 engine;
@@ -49,7 +51,7 @@ namespace lsh {
                  string distance = "euclidean", unsigned random_state = 42) :
             k(k), r(r), d(d), L(L),
             distance_type(distance), distance_function(select_distance(distance)),
-            hash_tables(vector<unordered_multimap<vector<int>, Point, VectorHash>>(L)),
+            hash_tables(vector<unordered_map<vector<int>, RefSeries, VectorHash>>(L)),
             engine(mt19937(random_state)) {}
 
         HashFunc create_hash_func() {
@@ -111,49 +113,39 @@ namespace lsh {
 #pragma omp parallel for
             for (int i = 0; i < L; i++) {
                 const auto key = G[i](point);
-                hash_tables[i].emplace(key, point);
+                auto& hash_table = hash_tables[i];
+                auto& val = hash_table[key];
+                val.emplace_back(point);
             }
         }
 
-        void build(Series& series) {
+        void build(Series& dataset) {
             // set hash function
             for (int i = 0; i < L; i++) G.push_back(create_hash_family());
 
-            // insert series into hash table
-            for (int i = 0; i < series.size(); i++) insert(series[i]);
+            // insert dataset into hash table
+            series = move(dataset);
+            for (auto& data : series) insert(data);
         }
 
         void build(const string& data_path, int n) {
             // insert series into hash table
-            auto series = load_data(data_path, n);
-            build(series);
+            auto dataset = load_data(data_path, n);
+            build(dataset);
         }
 
-        Series find(const vector<int> key,
-                    const unordered_multimap<vector<int>, Point, VectorHash>&
-                    hash_table) const {
-            Series result;
-            auto bucket_itr = hash_table.equal_range(key);
-            for (auto itr = bucket_itr.first; itr != bucket_itr.second; itr++) {
-                result.push_back(itr->second);
-            }
-            return result;
-        }
-
-        Series get_bucket_contents(const Point& query) const {
-            Series result;
+        RefSeries get_bucket_contents(const Point& query) {
+            RefSeries result;
             for (int i = 0; i < L; i++) {
-                const HashTable& hash_table = hash_tables[i];
+                HashTable& hash_table = hash_tables[i];
                 const auto key = G[i](query);
-                auto bucket_itr = hash_table.equal_range(key);
-                for (auto itr = bucket_itr.first; itr != bucket_itr.second; itr++) {
-                    result.push_back(itr->second);
-                }
+                for (const auto& data : hash_table[key])
+                    result.emplace_back(data);
             }
             return result;
         }
 
-        SearchResult search(const Point& query, float range) const {
+        SearchResult search(const Point& query, float range) {
             const auto start = get_now();
             auto result = SearchResult();
 
@@ -162,10 +154,10 @@ namespace lsh {
             result.n_bucket_content += bucket_contents.size();
 
             for (const auto point : bucket_contents) {
-                if (checked[point.id]) continue;
-                checked[point.id] = true;
+                if (checked[point.get().id]) continue;
+                checked[point.get().id] = true;
                 if (distance_function(query, point) < range)
-                    result.series.push_back(point);
+                    result.series.emplace_back(point.get());
             }
 
             const auto end = get_now();

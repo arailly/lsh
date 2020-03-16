@@ -16,25 +16,6 @@ TEST(lsh, create_hash_func) {
     ASSERT_EQ(hash_vector.size(), k);
 }
 
-TEST(lsh, find) {
-    const int k = 2, d = 128, r = 1, n = 1, L = 1;
-    const string data_path = "/home/arai/workspace/dataset/sift/sift_base/";
-    const auto series = load_data(data_path, n);
-    auto series_for_index = series;
-
-    auto index = LSHIndex(k, r, d, L);
-    index.build(series_for_index);
-
-    for (int i = 0; i < 10; i++) {
-        bool include_self = false;
-        const auto find_result = index.find(index.G[0](series[i]), index.hash_tables[0]);
-        for (const auto e : find_result) {
-            if (e.id == i) include_self = true;
-        }
-        ASSERT_TRUE(include_self);
-    }
-}
-
 TEST(lsh, search) {
     const int k = 2, d = 128, r = 250, n = 3, L = 3;
     float range = 350;
@@ -52,7 +33,7 @@ TEST(lsh, search) {
 }
 
 TEST(lsh, euclidean) {
-    const int k = 3, d = 2, r = 3, L = 8;
+    const int k = 4, d = 2, r = 3, L = 8;
     const auto series = [&]() {
         auto series_ = Series();
         for (int i = 0; i < 10; i++) {
