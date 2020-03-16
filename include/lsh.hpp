@@ -134,13 +134,21 @@ namespace lsh {
             build(dataset);
         }
 
-        RefSeries get_bucket_contents(const Point& query) {
+        RefSeries get_bucket_contents(const Point& query, int limit = -1) {
             RefSeries result;
+            bool over = false;
+
             for (int i = 0; i < L; i++) {
                 HashTable& hash_table = hash_tables[i];
                 const auto key = G[i](query);
-                for (const auto& data : hash_table[key])
+                for (const auto& data : hash_table[key]) {
                     result.emplace_back(data);
+                    if (limit != -1 && result.size() >= limit) {
+                        over = true;
+                        break;
+                    }
+                }
+                if (over) break;
             }
             return result;
         }
