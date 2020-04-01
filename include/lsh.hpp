@@ -32,10 +32,10 @@ namespace lsh {
         size_t n_bucket_content = 0;
     };
 
-    typedef function<int(const Point&)> HashFunc;
-    typedef function<vector<int>(const Point&)> HashFamilyFunc;
-    typedef vector<reference_wrapper<const Point>> RefSeries;
-    typedef unordered_map<vector<int>, RefSeries, VectorHash> HashTable;
+    using HashFunc = function<int(const Point&)>;
+    using HashFamilyFunc = function<vector<int>(const Point&)>;
+    using RefSeries = vector<reference_wrapper<const Point>>;
+    using HashTable = unordered_map<vector<int>, RefSeries, VectorHash>;
 
     struct LSHIndex {
         const int k, d, L;
@@ -153,7 +153,7 @@ namespace lsh {
             return result;
         }
 
-        SearchResult search(const Point& query, float range) {
+        SearchResult range_search(const Point& query, float range) {
             const auto start = get_now();
             auto result = SearchResult();
 

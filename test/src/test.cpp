@@ -27,7 +27,7 @@ TEST(lsh, search) {
     index.build(series_for_index);
 
     for (const auto i : vector<int>{12, 21, 22, 23, 30, 40}) {
-        const auto result = index.search(series[i], range);
+        const auto result = index.range_search(series[i], range);
         ASSERT_GT(result.series.size(), 0);
     }
 }
@@ -53,7 +53,7 @@ TEST(lsh, euclidean) {
 
     const auto query = Point(999, {4.5, 4.5});
 
-    const auto result = index.search(query, 1.5);
+    const auto result = index.range_search(query, 1.5);
     ASSERT_EQ(result.series.size(), 4);
 }
 
@@ -78,7 +78,7 @@ TEST(lsh, manhattan) {
 
     const auto query = Point(999, {4.5, 4.5});
 
-    const auto result = index.search(query, 1.1);
+    const auto result = index.range_search(query, 1.1);
     ASSERT_EQ(result.series.size(), 4);
 }
 
@@ -103,7 +103,7 @@ TEST(lsh, angular) {
     index.build(series_for_index);
 
     const auto query = Point(999, {4.5, 4.5});
-    const auto result = index.search(query, 0.0001);
+    const auto result = index.range_search(query, 0.0001);
     ASSERT_EQ(result.series.size(), 7);
 }
 

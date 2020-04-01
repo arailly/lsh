@@ -42,7 +42,7 @@ int main() {
 
     vector<SearchResult> results;
     for (const auto& query : queries) {
-        const auto result = index.search(query, range);
+        const auto result = index.range_search(query, range);
         results.push_back(result);
     }
 
