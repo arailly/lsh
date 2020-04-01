@@ -26,19 +26,19 @@ namespace lsh {
         }
     };
 
-    struct SearchResult {
-        Series series;
-        time_t time = 0;
-        size_t n_bucket_content = 0;
-    };
-
     using HashFunc = function<int(const Point&)>;
     using HashFamilyFunc = function<vector<int>(const Point&)>;
     using RefSeries = vector<reference_wrapper<const Point>>;
     using HashTable = unordered_map<vector<int>, RefSeries, VectorHash>;
 
+    struct SearchResult {
+        RefSeries series;
+        time_t time = 0;
+        size_t n_bucket_content = 0;
+    };
+
     struct LSHIndex {
-        const int k, d, L;
+        const int n_hash_func, d, L;
         const DistanceFunction distance_function;
         const string distance_type;
         const float r;
@@ -47,11 +47,11 @@ namespace lsh {
         vector<HashTable> hash_tables;
         mt19937 engine;
 
-        LSHIndex(int k, float r, int d, int L,
+        LSHIndex(int n_hash_func_, float r, int d, int L,
                  string distance = "euclidean", unsigned random_state = 42) :
-            k(k), r(r), d(d), L(L),
-            distance_type(distance), distance_function(select_distance(distance)),
-            hash_tables(vector<unordered_map<vector<int>, RefSeries, VectorHash>>(L)),
+                n_hash_func(n_hash_func_), r(r), d(d), L(L),
+                distance_type(distance), distance_function(select_distance(distance)),
+                hash_tables(vector<unordered_map<vector<int>, RefSeries, VectorHash>>(L)),
             engine(mt19937(random_state)) {}
 
         HashFunc create_hash_func() {
@@ -87,7 +87,7 @@ namespace lsh {
 
         HashFamilyFunc create_hash_family() {
             vector<HashFunc> hash_funcs;
-            for (int i = 0; i < k; i++) {
+            for (int i = 0; i < n_hash_func; i++) {
                 const auto h = create_hash_func();
                 hash_funcs.push_back(h);
             }
@@ -165,8 +165,35 @@ namespace lsh {
                 if (checked[point.get().id]) continue;
                 checked[point.get().id] = true;
                 if (distance_function(query, point) < range)
-                    result.series.emplace_back(point.get());
+                    result.series.emplace_back(point);
             }
+
+            const auto end = get_now();
+            result.time = get_duration(start, end);
+            return result;
+        }
+
+        SearchResult knn_search(const Point& query, int k) {
+            const auto start = get_now();
+            auto result = SearchResult();
+
+            unordered_map<size_t, bool> checked;
+            multimap<float, reference_wrapper<const Point>> result_map;
+
+            const auto bucket_contents = get_bucket_contents(query);
+            result.n_bucket_content = bucket_contents.size();
+
+            for (const auto point : bucket_contents) {
+                if (checked[point.get().id]) continue;
+                checked[point.get().id] = true;
+
+                const auto dist = distance_function(query, point);
+                result_map.emplace(dist, point);
+
+                if (result_map.size() > k) result_map.erase(--result_map.cend());
+            }
+
+            for (const auto& pair : result_map) result.series.emplace_back(pair.second);
 
             const auto end = get_now();
             result.time = get_duration(start, end);

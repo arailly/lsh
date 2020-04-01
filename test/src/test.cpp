@@ -135,3 +135,33 @@ TEST(lsh, get_bucket_contents) {
     const auto bucket_contents_2 = index.get_bucket_contents(query, limit);
     ASSERT_EQ(bucket_contents_2.size(), limit);
 }
+
+TEST(lsh, knn_search) {
+    const int n_hash_func = 4, d = 2, r = 3, L = 8;
+    const auto series = [&]() {
+        auto series_ = Series();
+        for (int i = 0; i < 10; i++) {
+            for (int j = 0; j < 10; j++) {
+                const auto id = (size_t)(10 * i + j);
+                const float x = i, y = j;
+                const auto point = Point(id, {x, y});
+                series_.push_back(point);
+            }
+        }
+        return series_;
+    }();
+    auto series_for_index = series;
+
+    auto index = LSHIndex(n_hash_func, r, d, L);
+    index.build(series_for_index);
+
+    const auto query = Point(999, {4.5, 4.5});
+    const auto k = 4;
+
+    const auto result = index.knn_search(query, k);
+    ASSERT_EQ(result.series.size(), k);
+    ASSERT_EQ(result.series[0].get().id, 44);
+    ASSERT_EQ(result.series[1].get().id, 54);
+    ASSERT_EQ(result.series[2].get().id, 45);
+    ASSERT_EQ(result.series[3].get().id, 55);
+}
