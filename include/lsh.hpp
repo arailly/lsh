@@ -32,9 +32,48 @@ namespace lsh {
     using HashTable = unordered_map<vector<int>, RefSeries, VectorHash>;
 
     struct SearchResult {
-        RefSeries series;
         time_t time = 0;
-        size_t n_bucket_content = 0;
+        time_t lsh_time = 0;
+        time_t graph_time = 0;
+        RefSeries result;
+        unsigned long n_bucket_content = 0;
+        unsigned long n_node_access = 0;
+        unsigned long n_distinct_node_access = 0;
+    };
+
+    struct SearchResults {
+        vector<SearchResult> results;
+        void push_back(const SearchResult& result) { results.push_back(result); }
+
+        void save(const string& log_path, const string& result_path, int k) {
+            ofstream log_ofs(log_path);
+            string line = "time,n_bucket_content";
+            log_ofs << line << endl;
+
+            ofstream result_ofs(result_path);
+            line = "query_id,data_id";
+            result_ofs << line << endl;
+
+            int query_id = 0;
+            for (const auto& result : results) {
+                line = to_string(result.time) + "," +
+                       to_string(result.n_bucket_content);
+                log_ofs << line << endl;
+
+                for (const auto& data : result.result) {
+                    line = to_string(query_id) + "," + to_string(data.get().id);
+                    result_ofs << line << endl;
+                }
+
+                const auto n_miss = k - result.result.size();
+                for (int i = 0; i < n_miss; i++) {
+                    line = to_string(query_id) + "," + to_string(-1);
+                    result_ofs << line << endl;
+                }
+
+                query_id++;
+            }
+        }
     };
 
     struct LSHIndex {
@@ -165,7 +204,7 @@ namespace lsh {
                 if (checked[point.get().id]) continue;
                 checked[point.get().id] = true;
                 if (distance_function(query, point) < range)
-                    result.series.emplace_back(point);
+                    result.result.emplace_back(point);
             }
 
             const auto end = get_now();
@@ -193,7 +232,7 @@ namespace lsh {
                 if (result_map.size() > k) result_map.erase(--result_map.cend());
             }
 
-            for (const auto& pair : result_map) result.series.emplace_back(pair.second);
+            for (const auto& pair : result_map) result.result.emplace_back(pair.second);
 
             const auto end = get_now();
             result.time = get_duration(start, end);

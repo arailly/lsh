@@ -28,7 +28,7 @@ TEST(lsh, search) {
 
     for (const auto i : vector<int>{12, 21, 22, 23, 30, 40}) {
         const auto result = index.range_search(series[i], range);
-        ASSERT_GT(result.series.size(), 0);
+        ASSERT_GT(result.result.size(), 0);
     }
 }
 
@@ -54,7 +54,7 @@ TEST(lsh, euclidean) {
     const auto query = Point(999, {4.5, 4.5});
 
     const auto result = index.range_search(query, 1.5);
-    ASSERT_EQ(result.series.size(), 4);
+    ASSERT_EQ(result.result.size(), 4);
 }
 
 TEST(lsh, manhattan) {
@@ -79,7 +79,7 @@ TEST(lsh, manhattan) {
     const auto query = Point(999, {4.5, 4.5});
 
     const auto result = index.range_search(query, 1.1);
-    ASSERT_EQ(result.series.size(), 4);
+    ASSERT_EQ(result.result.size(), 4);
 }
 
 TEST(lsh, angular) {
@@ -104,7 +104,7 @@ TEST(lsh, angular) {
 
     const auto query = Point(999, {4.5, 4.5});
     const auto result = index.range_search(query, 0.0001);
-    ASSERT_EQ(result.series.size(), 7);
+    ASSERT_EQ(result.result.size(), 7);
 }
 
 TEST(lsh, get_bucket_contents) {
@@ -159,9 +159,36 @@ TEST(lsh, knn_search) {
     const auto k = 4;
 
     const auto result = index.knn_search(query, k);
-    ASSERT_EQ(result.series.size(), k);
-    ASSERT_EQ(result.series[0].get().id, 44);
-    ASSERT_EQ(result.series[1].get().id, 54);
-    ASSERT_EQ(result.series[2].get().id, 45);
-    ASSERT_EQ(result.series[3].get().id, 55);
+    ASSERT_EQ(result.result.size(), k);
+    ASSERT_EQ(result.result[0].get().id, 44);
+    ASSERT_EQ(result.result[1].get().id, 54);
+    ASSERT_EQ(result.result[2].get().id, 45);
+    ASSERT_EQ(result.result[3].get().id, 55);
+}
+
+TEST(lsh, knn_search_sift) {
+    const int n = 1000, n_query = 10000, k = 5;
+    const string data_path = "/home/arai/workspace/dataset/sift/data1m/";
+    const string query_path = "/home/arai/workspace/dataset/sift/sift_query.csv";
+
+    const auto queries = load_data(query_path, n_query);
+
+    const int n_hash_func = 4, r = 250, d = queries[0].size();
+
+    auto index = LSHIndex(n_hash_func, r, d, 1);
+    index.build(data_path, n);
+
+    cout << "complete: build index" << endl;
+
+    SearchResults results;
+    for (const auto& query : queries) {
+        const auto result = index.knn_search(query, k);
+        results.push_back(result);
+    }
+
+    const string log_path = "/home/arai/workspace/result/knn-search/lsh/sift/data1m/k5/"
+                            "log-k4r250.csv";
+    const string result_path = "/home/arai/workspace/result/knn-search/lsh/sift/data1m/k5/"
+                               "result-k4r250.csv";
+    results.save(log_path, result_path, k);
 }

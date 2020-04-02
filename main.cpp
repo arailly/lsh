@@ -13,7 +13,7 @@ void save_result(const string& save_path, const vector<SearchResult>& results) {
 
     for (const auto& result : results) {
         line = to_string(result.time) + "," +
-               to_string(result.series.size()) + "," +
+               to_string(result.result.size()) + "," +
                to_string(result.n_bucket_content) + "\n";
         ofs << line;
     }
