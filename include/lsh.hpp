@@ -26,9 +26,9 @@ namespace lsh {
         }
     };
 
-    using HashFunc = function<int(const Point&)>;
-    using HashFamilyFunc = function<vector<int>(const Point&)>;
-    using RefSeries = vector<reference_wrapper<const Point>>;
+    using HashFunc = function<int(const Data<>&)>;
+    using HashFamilyFunc = function<vector<int>(const Data<>&)>;
+    using RefSeries = vector<reference_wrapper<const Data<>>>;
     using HashTable = unordered_map<vector<int>, RefSeries, VectorHash>;
 
     struct SearchResult {
@@ -77,21 +77,22 @@ namespace lsh {
     };
 
     struct LSHIndex {
-        const int n_hash_func, d, L;
-        const DistanceFunction distance_function;
+        const int m, L;
+        int dim;
+        const DistanceFunction<> distance_function;
         const string distance_type;
         const float r;
-        Series series;
+        Series<> series;
         vector<HashFamilyFunc> G;
         vector<HashTable> hash_tables;
         mt19937 engine;
 
-        LSHIndex(int n_hash_func_, float r, int d, int L,
+        LSHIndex(int n_hash_func_, float r, int L,
                  string distance = "euclidean", unsigned random_state = 42) :
-                n_hash_func(n_hash_func_), r(r), d(d), L(L),
+                m(n_hash_func_), r(r), L(L),
                 distance_type(distance), distance_function(select_distance(distance)),
                 hash_tables(vector<unordered_map<vector<int>, RefSeries, VectorHash>>(L)),
-            engine(mt19937(random_state)) {}
+                engine(random_state) {}
 
         HashFunc create_hash_func() {
             cauchy_distribution<float> cauchy_dist(0, 1);
@@ -100,7 +101,7 @@ namespace lsh {
 
             const auto a = [&]() {
                 vector<float> random_vector;
-                for (int j = 0; j < d; j++) {
+                for (int j = 0; j < dim; j++) {
                     if (distance_type == "manhattan")
                         random_vector.push_back(cauchy_dist(engine));
                     else random_vector.push_back(norm_dist(engine));
@@ -111,13 +112,13 @@ namespace lsh {
             const auto b = unif_dist(engine);
 
             if (distance_type == "angular") {
-                return [=](const Point& p) {
+                return [=](const Data<>& p) {
                     const auto normalized = normalize(p);
                     const auto ip = inner_product(normalized.begin(), normalized.end(), a.begin(), 0.0);
                     return static_cast<int>((ip + b) / (r * 1.0));
                 };
             } else {
-                return [=](const Point& p) {
+                return [=](const Data<>& p) {
                     const auto ip = inner_product(p.begin(), p.end(), a.begin(), 0.0);
                     return static_cast<int>((ip + b) / (r * 1.0));
                 };
@@ -126,40 +127,41 @@ namespace lsh {
 
         HashFamilyFunc create_hash_family() {
             vector<HashFunc> hash_funcs;
-            for (int i = 0; i < n_hash_func; i++) {
+            for (int i = 0; i < m; i++) {
                 const auto h = create_hash_func();
                 hash_funcs.push_back(h);
             }
 
-            return [=](const Point& p) {
+            return [=](const Data<>& p) {
                 vector<int> hash_vector;
                 for (const auto& h : hash_funcs) hash_vector.push_back(h(p));
                 return hash_vector;
             };
         }
 
-        Point normalize(const Point& point) const {
-            auto normalized = vector<float>(point.size(), 0);
-            const auto origin = vector<float>(point.size(), 0);
-            const float norm = euclidean_distance(point, origin);
-            for (int i = 0; i < point.size(); i++) {
-                normalized[i] = point[i] / norm;
+        Data<> normalize(const Data<>& data) const {
+            auto normalized = vector<float>(data.size(), 0);
+            const auto origin = Data<>(data.id, vector<float>(data.size(), 0));
+            const float norm = euclidean_distance(data, origin);
+            for (int i = 0; i < data.size(); i++) {
+                normalized[i] = data[i] / norm;
             }
-            return normalized;
+            return Data<>(data.id, normalized);
         }
 
-        void insert(const Point& point) {
+        void insert(const Data<>& data) {
 #pragma omp parallel for
             for (int i = 0; i < L; i++) {
-                const auto key = G[i](point);
+                const auto key = G[i](data);
                 auto& hash_table = hash_tables[i];
                 auto& val = hash_table[key];
-                val.emplace_back(point);
+                val.emplace_back(data);
             }
         }
 
-        void build(Series& dataset) {
+        void build(Series<>& dataset) {
             // set hash function
+            dim = dataset[0].size();
             for (int i = 0; i < L; i++) G.push_back(create_hash_family());
 
             // insert dataset into hash table
@@ -173,9 +175,9 @@ namespace lsh {
             build(dataset);
         }
 
-        RefSeries get_bucket_contents(const Point& query, int limit = -1) {
+        RefSeries get_bucket_contents(const Data<>& query, int limit = -1) {
             RefSeries result;
-            bool over = false;
+            bool is_enough = false;
 
             for (int i = 0; i < L; i++) {
                 HashTable& hash_table = hash_tables[i];
@@ -183,16 +185,16 @@ namespace lsh {
                 for (const auto& data : hash_table[key]) {
                     result.emplace_back(data);
                     if (limit != -1 && result.size() >= limit) {
-                        over = true;
+                        is_enough = true;
                         break;
                     }
                 }
-                if (over) break;
+                if (is_enough) break;
             }
             return result;
         }
 
-        SearchResult range_search(const Point& query, float range) {
+        SearchResult range_search(const Data<>& query, float range) {
             const auto start = get_now();
             auto result = SearchResult();
 
@@ -200,11 +202,11 @@ namespace lsh {
             const auto bucket_contents = get_bucket_contents(query);
             result.n_bucket_content += bucket_contents.size();
 
-            for (const auto point : bucket_contents) {
-                if (checked[point.get().id]) continue;
-                checked[point.get().id] = true;
-                if (distance_function(query, point) < range)
-                    result.result.emplace_back(point);
+            for (const auto& data : bucket_contents) {
+                if (checked[data.get().id]) continue;
+                checked[data.get().id] = true;
+                if (distance_function(query, data) < range)
+                    result.result.emplace_back(data);
             }
 
             const auto end = get_now();
@@ -212,22 +214,22 @@ namespace lsh {
             return result;
         }
 
-        SearchResult knn_search(const Point& query, int k) {
+        SearchResult knn_search(const Data<>& query, int k) {
             const auto start = get_now();
             auto result = SearchResult();
 
             unordered_map<size_t, bool> checked;
-            multimap<float, reference_wrapper<const Point>> result_map;
+            multimap<float, reference_wrapper<const Data<>>> result_map;
 
             const auto bucket_contents = get_bucket_contents(query);
             result.n_bucket_content = bucket_contents.size();
 
-            for (const auto point : bucket_contents) {
-                if (checked[point.get().id]) continue;
-                checked[point.get().id] = true;
+            for (const auto& data : bucket_contents) {
+                if (checked[data.get().id]) continue;
+                checked[data.get().id] = true;
 
-                const auto dist = distance_function(query, point);
-                result_map.emplace(dist, point);
+                const auto dist = distance_function(query, data);
+                result_map.emplace(dist, data);
 
                 if (result_map.size() > k) result_map.erase(--result_map.cend());
             }

@@ -33,9 +33,7 @@ int main() {
 
     const auto queries = load_data(query_path, n_query);
 
-    size_t d = queries[0].size();
-
-    auto index = LSHIndex(k, r, d, L, distance);
+    auto index = LSHIndex(k, r, L, distance);
     index.build(data_path, n);
 
     cout << "complete: build index" << endl;
