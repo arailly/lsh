@@ -120,10 +120,10 @@ TEST(lsh, get_bucket_contents) {
     const auto query = Data<>(999, {4.5, 4.5});
 
     const auto limit = 10;
-    const auto bucket_contents_1 = index.get_bucket_contents(query);
+    const auto bucket_contents_1 = index.find(query);
     ASSERT_GT(bucket_contents_1.size(), limit);
 
-    const auto bucket_contents_2 = index.get_bucket_contents(query, limit);
+    const auto bucket_contents_2 = index.find(query, limit);
     ASSERT_EQ(bucket_contents_2.size(), limit);
 }
 

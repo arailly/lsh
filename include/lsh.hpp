@@ -174,7 +174,7 @@ namespace lsh {
             build(in_dataset);
         }
 
-        auto get_bucket_contents(const Data<>& query, int limit = -1) {
+        auto find(const Data<>& query, int limit = -1) {
             vector<int> result;
             bool is_enough = false;
 
@@ -198,7 +198,7 @@ namespace lsh {
             auto result = SearchResult();
 
             unordered_map<size_t, bool> checked;
-            const auto bucket_contents = get_bucket_contents(query);
+            const auto bucket_contents = find(query);
             result.n_bucket_content += bucket_contents.size();
 
             for (const auto& data_id : bucket_contents) {
@@ -221,7 +221,7 @@ namespace lsh {
             unordered_map<size_t, bool> checked;
             multimap<double, int> result_map;
 
-            const auto bucket_contents = get_bucket_contents(query);
+            const auto bucket_contents = find(query);
             result.n_bucket_content = bucket_contents.size();
 
             for (const auto& data_id : bucket_contents) {
