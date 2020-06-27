@@ -7,18 +7,9 @@ using namespace std;
 using namespace arailib;
 using namespace lsh;
 
-TEST(lsh, create_hash_func) {
-    const int k = 2, L = 1, r = 1;
-    auto index = LSHIndex(k, r, L);
-    auto hash_func = index.create_hash_family();
-    const Data<> p(0, {1, 2});
-    const auto hash_vector = hash_func(p);
-    ASSERT_EQ(hash_vector.size(), k);
-}
-
 TEST(lsh, search) {
     const int k = 2, r = 250, n = 3, L = 3;
-    float range = 350;
+    double range = 350;
     const string data_path = "/home/arai/workspace/dataset/sift/sift_base/";
     const auto series = load_data(data_path, n);
     auto series_for_index = series;
@@ -39,7 +30,7 @@ TEST(lsh, euclidean) {
         for (int i = 0; i < 10; i++) {
             for (int j = 0; j < 10; j++) {
                 const auto id = (size_t)(10 * i + j);
-                const float x = i, y = j;
+                const double x = i, y = j;
                 const auto point = Data<>(id, {x, y});
                 series_.push_back(point);
             }
@@ -64,7 +55,7 @@ TEST(lsh, manhattan) {
         for (int i = 0; i < 10; i++) {
             for (int j = 0; j < 10; j++) {
                 const auto id = (size_t)(10 * i + j);
-                const float x = i, y = j;
+                const double x = i, y = j;
                 const auto point = Data<>(id, {x, y});
                 series_.push_back(point);
             }
@@ -84,13 +75,13 @@ TEST(lsh, manhattan) {
 
 TEST(lsh, angular) {
     const int k = 4, L = 1;
-    const float r = 0.00001;
+    const double r = 0.00001;
     const auto series = [&]() {
         auto series_ = Series<>();
         for (int i = 0; i < 10; i++) {
             for (int j = 0; j < 10; j++) {
                 const auto id = (size_t)(10 * i + j);
-                const float x = i, y = j;
+                const double x = i, y = j;
                 const auto point = Data<>(id, {x, y});
                 series_.push_back(point);
             }
@@ -114,7 +105,7 @@ TEST(lsh, get_bucket_contents) {
         for (int i = 0; i < 10; i++) {
             for (int j = 0; j < 10; j++) {
                 const auto id = (size_t)(10 * i + j);
-                const float x = i, y = j;
+                const double x = i, y = j;
                 const auto point = Data<>(id, {x, y});
                 series_.push_back(point);
             }
@@ -143,7 +134,7 @@ TEST(lsh, knn_search) {
         for (int i = 0; i < 10; i++) {
             for (int j = 0; j < 10; j++) {
                 const auto id = (size_t)(10 * i + j);
-                const float x = i, y = j;
+                const double x = i, y = j;
                 const auto point = Data<>(id, {x, y});
                 series_.push_back(point);
             }
@@ -160,22 +151,22 @@ TEST(lsh, knn_search) {
 
     const auto result = index.knn_search(query, k);
     ASSERT_EQ(result.result.size(), k);
-    ASSERT_EQ(result.result[0].get().id, 44);
-    ASSERT_EQ(result.result[1].get().id, 54);
-    ASSERT_EQ(result.result[2].get().id, 45);
-    ASSERT_EQ(result.result[3].get().id, 55);
+    ASSERT_EQ(result.result[0], 44);
+    ASSERT_EQ(result.result[1], 45);
+    ASSERT_EQ(result.result[2], 54);
+    ASSERT_EQ(result.result[3], 55);
 }
 
 TEST(lsh, knn_search_sift) {
-    const int n = 1000, n_query = 10000, k = 5;
+    const int n = 1000, n_query = 10000, k = 10;
     const string data_path = "/home/arai/workspace/dataset/sift/data1m/";
     const string query_path = "/home/arai/workspace/dataset/sift/sift_query.csv";
 
     const auto queries = load_data(query_path, n_query);
 
-    const int n_hash_func = 4, r = 100, L = 20;
+    const int m = 4, r = 200, L = 10;
 
-    auto index = LSHIndex(n_hash_func, r, L);
+    auto index = LSHIndex(m, r, L);
     index.build(data_path, n);
 
     cout << "complete: build index" << endl;
@@ -186,9 +177,9 @@ TEST(lsh, knn_search_sift) {
         results.push_back(result);
     }
 
-    const string log_path = "/home/arai/workspace/result/knn-search/lsh/sift/data1m/k5/"
-                            "log-k4r100L20.csv";
-    const string result_path = "/home/arai/workspace/result/knn-search/lsh/sift/data1m/k5/"
-                               "result-k4r100L20.csv";
+    const string log_path = "/home/arai/workspace/result/knn-search/lsh/sift/data1m/k10/"
+                            "log-m4r200L10.csv";
+    const string result_path = "/home/arai/workspace/result/knn-search/lsh/sift/data1m/k10/"
+                               "result-m4r200L10.csv";
     results.save(log_path, result_path, k);
 }

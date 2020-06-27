@@ -28,14 +28,13 @@ namespace lsh {
 
     using HashFunc = function<int(const Data<>&)>;
     using HashFamilyFunc = function<vector<int>(const Data<>&)>;
-    using RefSeries = vector<reference_wrapper<const Data<>>>;
-    using HashTable = unordered_map<vector<int>, RefSeries, VectorHash>;
+    using HashTable = unordered_map<vector<int>, vector<int>, VectorHash>;
 
     struct SearchResult {
         time_t time = 0;
         time_t lsh_time = 0;
         time_t graph_time = 0;
-        RefSeries result;
+        vector<int> result;
         unsigned long n_bucket_content = 0;
         unsigned long n_node_access = 0;
         unsigned long n_distinct_node_access = 0;
@@ -60,8 +59,8 @@ namespace lsh {
                        to_string(result.n_bucket_content);
                 log_ofs << line << endl;
 
-                for (const auto& data : result.result) {
-                    line = to_string(query_id) + "," + to_string(data.get().id);
+                for (const auto& data_id : result.result) {
+                    line = to_string(query_id) + "," + to_string(data_id);
                     result_ofs << line << endl;
                 }
 
@@ -81,26 +80,26 @@ namespace lsh {
         int dim;
         const DistanceFunction<> distance_function;
         const string distance_type;
-        const float r;
-        Series<> series;
+        const double r;
+        Dataset<> dataset;
         vector<HashFamilyFunc> G;
         vector<HashTable> hash_tables;
         mt19937 engine;
 
-        LSHIndex(int n_hash_func_, float r, int L,
+        LSHIndex(int n_hash_func_, double r, int L,
                  string distance = "euclidean", unsigned random_state = 42) :
                 m(n_hash_func_), r(r), L(L),
                 distance_type(distance), distance_function(select_distance(distance)),
-                hash_tables(vector<unordered_map<vector<int>, RefSeries, VectorHash>>(L)),
+                hash_tables(vector<unordered_map<vector<int>, vector<int>, VectorHash>>(L)),
                 engine(random_state) {}
 
         HashFunc create_hash_func() {
-            cauchy_distribution<float> cauchy_dist(0, 1);
-            normal_distribution<float> norm_dist(0, 1);
-            uniform_real_distribution<float> unif_dist(0, r);
+            cauchy_distribution<double> cauchy_dist(0, 1);
+            normal_distribution<double> norm_dist(0, 1);
+            uniform_real_distribution<double> unif_dist(0, r);
 
             const auto a = [&]() {
-                vector<float> random_vector;
+                vector<double> random_vector;
                 for (int j = 0; j < dim; j++) {
                     if (distance_type == "manhattan")
                         random_vector.push_back(cauchy_dist(engine));
@@ -140,9 +139,9 @@ namespace lsh {
         }
 
         Data<> normalize(const Data<>& data) const {
-            auto normalized = vector<float>(data.size(), 0);
-            const auto origin = Data<>(data.id, vector<float>(data.size(), 0));
-            const float norm = euclidean_distance(data, origin);
+            auto normalized = vector<double>(data.size(), 0);
+            const auto origin = Data<>(data.id, vector<double>(data.size(), 0));
+            const double norm = euclidean_distance(data, origin);
             for (int i = 0; i < data.size(); i++) {
                 normalized[i] = data[i] / norm;
             }
@@ -155,35 +154,35 @@ namespace lsh {
                 const auto key = G[i](data);
                 auto& hash_table = hash_tables[i];
                 auto& val = hash_table[key];
-                val.emplace_back(data);
+                val.emplace_back(data.id);
             }
         }
 
-        void build(Series<>& dataset) {
+        void build(const Dataset<>& in_dataset) {
             // set hash function
+            dataset = in_dataset;
             dim = dataset[0].size();
             for (int i = 0; i < L; i++) G.push_back(create_hash_family());
 
             // insert dataset into hash table
-            series = move(dataset);
-            for (auto& data : series) insert(data);
+            for (auto& data : dataset) insert(data);
         }
 
         void build(const string& data_path, int n) {
-            // insert series into hash table
-            auto dataset = load_data(data_path, n);
-            build(dataset);
+            // insert dataset into hash table
+            auto in_dataset = load_data(data_path, n);
+            build(in_dataset);
         }
 
-        RefSeries get_bucket_contents(const Data<>& query, int limit = -1) {
-            RefSeries result;
+        auto get_bucket_contents(const Data<>& query, int limit = -1) {
+            vector<int> result;
             bool is_enough = false;
 
             for (int i = 0; i < L; i++) {
                 HashTable& hash_table = hash_tables[i];
                 const auto key = G[i](query);
-                for (const auto& data : hash_table[key]) {
-                    result.emplace_back(data);
+                for (const auto& data_id : hash_table[key]) {
+                    result.emplace_back(data_id);
                     if (limit != -1 && result.size() >= limit) {
                         is_enough = true;
                         break;
@@ -194,7 +193,7 @@ namespace lsh {
             return result;
         }
 
-        SearchResult range_search(const Data<>& query, float range) {
+        auto range_search(const Data<>& query, double range) {
             const auto start = get_now();
             auto result = SearchResult();
 
@@ -202,11 +201,12 @@ namespace lsh {
             const auto bucket_contents = get_bucket_contents(query);
             result.n_bucket_content += bucket_contents.size();
 
-            for (const auto& data : bucket_contents) {
-                if (checked[data.get().id]) continue;
-                checked[data.get().id] = true;
+            for (const auto& data_id : bucket_contents) {
+                if (checked[data_id]) continue;
+                checked[data_id] = true;
+                const auto& data = dataset[data_id];
                 if (distance_function(query, data) < range)
-                    result.result.emplace_back(data);
+                    result.result.emplace_back(data_id);
             }
 
             const auto end = get_now();
@@ -214,22 +214,23 @@ namespace lsh {
             return result;
         }
 
-        SearchResult knn_search(const Data<>& query, int k) {
+        auto knn_search(const Data<>& query, int k) {
             const auto start = get_now();
             auto result = SearchResult();
 
             unordered_map<size_t, bool> checked;
-            multimap<float, reference_wrapper<const Data<>>> result_map;
+            multimap<double, int> result_map;
 
             const auto bucket_contents = get_bucket_contents(query);
             result.n_bucket_content = bucket_contents.size();
 
-            for (const auto& data : bucket_contents) {
-                if (checked[data.get().id]) continue;
-                checked[data.get().id] = true;
+            for (const auto& data_id : bucket_contents) {
+                if (checked[data_id]) continue;
+                checked[data_id] = true;
 
+                const auto& data = dataset[data_id];
                 const auto dist = distance_function(query, data);
-                result_map.emplace(dist, data);
+                result_map.emplace(dist, data_id);
 
                 if (result_map.size() > k) result_map.erase(--result_map.cend());
             }
