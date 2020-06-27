@@ -80,23 +80,23 @@ namespace lsh {
         int dim;
         const DistanceFunction<> distance_function;
         const string distance_type;
-        const double r;
+        const double w;
         Dataset<> dataset;
         vector<HashFamilyFunc> G;
         vector<HashTable> hash_tables;
         mt19937 engine;
 
-        LSHIndex(int n_hash_func_, double r, int L,
-                 string distance = "euclidean", unsigned random_state = 42) :
-                m(n_hash_func_), r(r), L(L),
+        LSHIndex(int n_hash_func_, double w, int L,
+                 string distance = "euclidean") :
+                m(n_hash_func_), w(w), L(L),
                 distance_type(distance), distance_function(select_distance(distance)),
                 hash_tables(vector<unordered_map<vector<int>, vector<int>, VectorHash>>(L)),
-                engine(random_state) {}
+                engine(42) {}
 
         HashFunc create_hash_func() {
             cauchy_distribution<double> cauchy_dist(0, 1);
             normal_distribution<double> norm_dist(0, 1);
-            uniform_real_distribution<double> unif_dist(0, r);
+            uniform_real_distribution<double> unif_dist(0, w);
 
             const auto a = [&]() {
                 vector<double> random_vector;
@@ -114,12 +114,12 @@ namespace lsh {
                 return [=](const Data<>& p) {
                     const auto normalized = normalize(p);
                     const auto ip = inner_product(normalized.begin(), normalized.end(), a.begin(), 0.0);
-                    return static_cast<int>((ip + b) / (r * 1.0));
+                    return static_cast<int>((ip + b) / (w * 1.0));
                 };
             } else {
                 return [=](const Data<>& p) {
                     const auto ip = inner_product(p.begin(), p.end(), a.begin(), 0.0);
-                    return static_cast<int>((ip + b) / (r * 1.0));
+                    return static_cast<int>((ip + b) / (w * 1.0));
                 };
             }
         }
