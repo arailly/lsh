@@ -27,6 +27,8 @@ int main() {
     const int L = 10; // number of hash tables
     const float r = 1; // bucket witdh
     const string& distance = "euclidean"; // distance name; we support "euclidean", "manhattan", and "angular".
+    
+    const auto queries = load_data(query_path, n_query); // read query file
 
     auto index = LSHIndex(k, r, L, distance);
     index.build(data_path, n); // build index
