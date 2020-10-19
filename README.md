@@ -19,7 +19,6 @@ using namespace lsh;
 int main() {
     const string data_path = "path/to/data.csv";
     const string query_path = "path/to/query.csv";
-    const string save_path = "path/to/result.csv";
     const unsigned n = 1000; // data size
     const unsigned n_query = 10; // query size
     const float range = 10; // search range (distance)
